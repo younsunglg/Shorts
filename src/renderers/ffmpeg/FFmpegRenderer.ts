@@ -1,20 +1,14 @@
 import ffmpeg from 'fluent-ffmpeg';
 import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
+import ffprobeInstaller from '@ffprobe-installer/ffprobe';
 import path from 'path';
 import { SubtitleGenerator, SubtitleSegment } from './SubtitleGenerator.js';
 import { AudioMixer } from './AudioMixer.js';
 import type { ShortsScript } from '../../types.js';
 
-// FFmpeg 경로 설정
+// FFmpeg와 FFprobe 경로 설정
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
-
-// FFprobe 경로 설정
-const ffprobePath = ffmpegInstaller.path.replace('ffmpeg.exe', 'ffprobe.exe').replace('ffmpeg', 'ffprobe');
-try {
-  ffmpeg.setFfprobePath(ffprobePath);
-} catch (e) {
-  console.warn('FFprobe 경로 설정 실패, 기본 경로 사용');
-}
+ffmpeg.setFfprobePath(ffprobeInstaller.path);
 
 export interface FFmpegRenderOptions {
   script: ShortsScript;

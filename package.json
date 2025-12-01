@@ -36,6 +36,7 @@
     "unsplash-js": "^7.0.19",
     "fluent-ffmpeg": "^2.1.2",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@ffprobe-installer/ffprobe": "^2.1.2",
     "@types/fluent-ffmpeg": "^2.1.24"
   },
   "devDependencies": {
