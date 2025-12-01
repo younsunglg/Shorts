@@ -20,26 +20,46 @@ export class VoiceGenerator {
       const outputPathEscaped = outputPath.replace(/\\/g, '/');
 
       const pythonScript = `# -*- coding: utf-8 -*-
-from gtts import gTTS
+import sys
+import os
+try:
+    from gtts import gTTS
 
-text = """${text}"""
-output_path = r"${outputPathEscaped}"
+    text = """${text}"""
+    output_path = r"${outputPathEscaped}"
 
-tts = gTTS(text, lang='${lang}')
-tts.save(output_path)
-print("완료")
+    # 디렉토리 생성
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+    tts = gTTS(text, lang='${lang}')
+    tts.save(output_path)
+
+    # 파일 생성 확인
+    if os.path.exists(output_path):
+        print("완료")
+    else:
+        print("ERROR: 파일 생성 실패", file=sys.stderr)
+        sys.exit(1)
+except Exception as e:
+    print(f"ERROR: {str(e)}", file=sys.stderr)
+    sys.exit(1)
 `;
 
       const pythonProcess = spawn('python', ['-c', pythonScript], { shell: true });
+      let stdout = '';
       let stderr = '';
+
+      pythonProcess.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
 
       pythonProcess.stderr.on('data', (data) => {
         stderr += data.toString();
       });
 
       pythonProcess.on('close', (code) => {
-        if (code !== 0) {
-          reject(new Error(`Google TTS 실패: ${stderr}`));
+        if (code !== 0 || stderr.includes('ERROR')) {
+          reject(new Error(`Google TTS 실패:\n${stderr}`));
         } else {
           console.log(`✅ 음성 생성 완료: ${outputPath}`);
           resolve(outputPath);
