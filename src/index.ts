@@ -7,6 +7,7 @@ import { BlogParser } from './parsers/blogParser.js';
 import { ScriptGenerator } from './generators/scriptGenerator.js';
 import { AudioGenerator } from './generators/audioGenerator.js';
 import { VideoRenderer } from './renderers/videoRenderer.js';
+import { FFmpegRenderer } from './renderers/ffmpeg/FFmpegRenderer.js';
 import { Logger } from './utils/logger.js';
 import type { ShortsGenerationOptions } from './types.js';
 
@@ -27,10 +28,14 @@ program
   .option('-u, --url <url>', '블로그 글 URL')
   .option('-t, --text <text>', '직접 텍스트 입력')
   .option('-o, --output <path>', '출력 파일 경로', './output/shorts.mp4')
-  .option('-s, --style <style>', '비디오 스타일 (modern, minimal, dynamic)', 'modern')
+  .option('-s, --style <style>', '비디오 스타일 (modern, cinematic, neon, glassmorphism)', 'modern')
   .option('-d, --duration <seconds>', '비디오 길이 (초)', '60')
+  .option('--renderer <type>', '렌더러 (ffmpeg, remotion)', 'ffmpeg')
+  .option('--tts <provider>', 'TTS 제공자 (edge, openai, elevenlabs)', 'edge')
+  .option('--voice <voice>', 'Edge TTS: ko-KR-SunHiNeural / OpenAI: nova', 'ko-KR-SunHiNeural')
+  .option('--bgm <path>', 'BGM 파일 경로 (옵션)')
+  .option('--bgm-volume <volume>', 'BGM 볼륨 (0-100)', '30')
   .option('--no-audio', '음성 생성 제외')
-  .option('--voice <voice>', 'OpenAI 음성 (alloy, echo, fable, onyx, nova, shimmer)', 'nova')
   .action(async (options) => {
     try {
       await generateShorts(options);
@@ -113,28 +118,61 @@ async function generateShorts(options: any) {
     const fullText = scriptGen.combineScriptToText(script);
 
     audioPath = path.join('./temp', 'audio.mp3');
-    await audioGen.generateWithOpenAI(fullText, audioPath, options.voice);
-    Logger.success(`음성 생성 완료: ${audioPath}\n`);
+
+    // TTS 제공자 선택
+    if (options.tts === 'edge') {
+      await audioGen.generateWithEdgeTTS(fullText, audioPath, options.voice);
+      Logger.success(`Edge TTS 음성 생성 완료 (무료!): ${audioPath}\n`);
+    } else if (options.tts === 'openai') {
+      await audioGen.generateWithOpenAI(fullText, audioPath, options.voice);
+      Logger.success(`OpenAI TTS 음성 생성 완료: ${audioPath}\n`);
+    } else if (options.tts === 'elevenlabs') {
+      await audioGen.generateWithElevenLabs(fullText, audioPath, options.voice);
+      Logger.success(`ElevenLabs 음성 생성 완료: ${audioPath}\n`);
+    }
   } else {
     Logger.info('3/5 음성 생성 생략 (--no-audio 옵션)\n');
   }
 
   // 5. 비디오 렌더링
-  Logger.progress('4/5 비디오 렌더링 중... (시간이 걸릴 수 있습니다)');
-  const renderer = new VideoRenderer({
-    width: 1080,
-    height: 1920,
-    fps: 30,
-    duration,
-  });
+  Logger.progress('4/5 비디오 렌더링 중...');
 
-  await renderer.renderShorts(
-    script,
-    blogPost.title,
-    audioPath,
-    options.output,
-    options.style
-  );
+  if (options.renderer === 'ffmpeg') {
+    // FFmpeg 렌더러 (빠르고 가벼움)
+    Logger.info('FFmpeg 렌더러 사용 (빠른 렌더링)\n');
+    const ffmpegRenderer = new FFmpegRenderer();
+
+    if (!audioPath) {
+      throw new Error('FFmpeg 렌더러는 음성이 필요합니다. --no-audio 옵션을 제거하세요.');
+    }
+
+    await ffmpegRenderer.renderShorts({
+      script,
+      title: blogPost.title,
+      audioPath,
+      outputPath: options.output,
+      style: options.style,
+      bgmPath: options.bgm,
+      bgmVolume: parseInt(options.bgmVolume) || 30,
+    });
+  } else {
+    // Remotion 렌더러 (고급 애니메이션)
+    Logger.info('Remotion 렌더러 사용 (고급 애니메이션)\n');
+    const renderer = new VideoRenderer({
+      width: 1080,
+      height: 1920,
+      fps: 30,
+      duration,
+    });
+
+    await renderer.renderShorts(
+      script,
+      blogPost.title,
+      audioPath,
+      options.output,
+      options.style
+    );
+  }
 
   Logger.success(`비디오 생성 완료: ${options.output}\n`);
 

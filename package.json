@@ -34,7 +34,9 @@
     "ora": "^8.0.1",
     "inquirer": "^9.2.12",
     "edge-tts": "^1.4.8",
-    "unsplash-js": "^7.0.19"
+    "unsplash-js": "^7.0.19",
+    "fluent-ffmpeg": "^2.1.2",
+    "@ffmpeg-installer/ffmpeg": "^1.1.0"
   },
   "devDependencies": {
     "@types/node": "^20.10.4",
