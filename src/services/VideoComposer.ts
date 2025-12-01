@@ -49,6 +49,11 @@ export class VideoComposer {
   ): Promise<string> {
     console.log('🎬 비디오 합성 중...');
 
+    // Windows 경로 처리: 백슬래시를 슬래시로 변환하고 이스케이프
+    const subtitlePathEscaped = subtitlePath
+      .replace(/\\/g, '/')
+      .replace(/:/g, '\\:');
+
     return new Promise((resolve, reject) => {
       ffmpeg()
         .input(backgroundPath)
@@ -57,7 +62,7 @@ export class VideoComposer {
           '-c:v libx264',
           '-c:a aac',
           '-b:a 192k',
-          `-vf ass=${subtitlePath}`,
+          `-vf ass=${subtitlePathEscaped}`,
           '-t ' + duration.toString(),
           '-preset medium',
           '-crf 23',
