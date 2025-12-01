@@ -25,8 +25,8 @@ export class AudioGenerator {
     voice: string = 'ko-KR-SunHiNeural' // 한국어 여성 목소리
   ): Promise<string> {
     try {
-      // Edge TTS 명령어 실행
-      const command = `edge-tts --voice "${voice}" --text "${text.replace(/"/g, '\\"')}" --write-media "${outputPath}"`;
+      // Windows와 호환되도록 python -m 형식으로 실행
+      const command = `python -m edge_tts --voice "${voice}" --text "${text.replace(/"/g, '\\"')}" --write-media "${outputPath}"`;
 
       await execAsync(command);
 
