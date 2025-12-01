@@ -53,10 +53,17 @@ export class VideoComposer {
     console.log('🎬 비디오 합성 중...');
 
     return new Promise((resolve, reject) => {
-      // Windows 경로를 슬래시로 변환하고 콜론 이스케이프
-      const subtitlePathEscaped = subtitlePath
-        .replace(/\\/g, '/')
-        .replace(/:/g, '\\:');
+      // Windows에서 FFmpeg ass 필터의 경로 문제 해결
+      // 모든 백슬래시를 슬래시로, 콜론 이스케이프, 추가로 싱글 쿼트로 감싸기
+      let subtitlePathEscaped = subtitlePath.replace(/\\/g, '/');
+
+      // 드라이브 문자의 콜론은 그대로 두고, 나머지 특수문자 이스케이프
+      subtitlePathEscaped = subtitlePathEscaped.replace(/:/g, '\\:');
+
+      // 경로 전체를 작은따옴표로 감싸기
+      const vfFilter = `ass='${subtitlePathEscaped}'`;
+
+      console.log(`   자막 필터: ${vfFilter}`);
 
       ffmpeg()
         .input(backgroundPath)
@@ -65,7 +72,7 @@ export class VideoComposer {
           '-c:v libx264',
           '-c:a aac',
           '-b:a 192k',
-          `-vf ass=${subtitlePathEscaped}`,
+          `-vf ${vfFilter}`,
           '-t ' + duration.toString(),
           '-preset medium',
           '-crf 23',
