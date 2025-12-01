@@ -1,8 +1,17 @@
 import ffmpeg from 'fluent-ffmpeg';
-import ffmpegPath from '@ffmpeg-installer/ffmpeg';
+import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import path from 'path';
 
-ffmpeg.setFfmpegPath(ffmpegPath.path);
+// FFmpeg와 FFprobe 경로 설정
+ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+
+// FFprobe 경로 설정 (ffmpeg과 같은 디렉토리에 있음)
+const ffprobePath = ffmpegInstaller.path.replace('ffmpeg.exe', 'ffprobe.exe').replace('ffmpeg', 'ffprobe');
+try {
+  ffmpeg.setFfprobePath(ffprobePath);
+} catch (e) {
+  // ffprobe가 없으면 무시 (나중에 설치 안내)
+}
 
 export interface AudioMixOptions {
   narrationPath: string;
