@@ -2,6 +2,10 @@ import OpenAI from 'openai';
 import axios from 'axios';
 import fs from 'fs/promises';
 import path from 'path';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 export class AudioGenerator {
   private openai: OpenAI;
@@ -10,6 +14,39 @@ export class AudioGenerator {
   constructor(openaiApiKey: string, elevenLabsApiKey?: string) {
     this.openai = new OpenAI({ apiKey: openaiApiKey });
     this.elevenLabsApiKey = elevenLabsApiKey;
+  }
+
+  /**
+   * Microsoft Edge TTS를 사용하여 음성 생성 (무료!)
+   */
+  async generateWithEdgeTTS(
+    text: string,
+    outputPath: string,
+    voice: string = 'ko-KR-SunHiNeural' // 한국어 여성 목소리
+  ): Promise<string> {
+    try {
+      // Edge TTS 명령어 실행
+      const command = `edge-tts --voice "${voice}" --text "${text.replace(/"/g, '\\"')}" --write-media "${outputPath}"`;
+
+      await execAsync(command);
+
+      return outputPath;
+    } catch (error) {
+      throw new Error(`Edge TTS 음성 생성 실패: ${error}`);
+    }
+  }
+
+  /**
+   * Edge TTS 사용 가능한 한국어 음성 목록
+   */
+  getEdgeTTSKoreanVoices(): Array<{ name: string; voice: string; gender: string }> {
+    return [
+      { name: '선희 (여성, 밝음)', voice: 'ko-KR-SunHiNeural', gender: 'Female' },
+      { name: '인준 (남성, 안정)', voice: 'ko-KR-InJoonNeural', gender: 'Male' },
+      { name: '보현 (남성, 젊음)', voice: 'ko-KR-BongJinNeural', gender: 'Male' },
+      { name: '구민 (남성, 차분)', voice: 'ko-KR-GookMinNeural', gender: 'Male' },
+      { name: '지민 (여성, 상냥)', voice: 'ko-KR-JiMinNeural', gender: 'Female' },
+    ];
   }
 
   /**
@@ -86,7 +123,7 @@ export class AudioGenerator {
   async generateSegments(
     textSegments: string[],
     outputDir: string,
-    provider: 'openai' | 'elevenlabs' = 'openai',
+    provider: 'openai' | 'elevenlabs' | 'edge' = 'edge',
     voice?: string
   ): Promise<string[]> {
     const audioPaths: string[] = [];
@@ -100,11 +137,17 @@ export class AudioGenerator {
           outputPath,
           (voice as any) || 'nova'
         );
-      } else {
+      } else if (provider === 'elevenlabs') {
         await this.generateWithElevenLabs(
           textSegments[i],
           outputPath,
           voice
+        );
+      } else if (provider === 'edge') {
+        await this.generateWithEdgeTTS(
+          textSegments[i],
+          outputPath,
+          voice || 'ko-KR-SunHiNeural'
         );
       }
 
