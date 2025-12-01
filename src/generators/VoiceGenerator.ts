@@ -2,6 +2,9 @@ import { spawn } from 'child_process';
 import ffmpeg from 'fluent-ffmpeg';
 import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import ffprobeInstaller from '@ffprobe-installer/ffprobe';
+import fs from 'fs/promises';
+import path from 'path';
+import os from 'os';
 
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 ffmpeg.setFfprobePath(ffprobeInstaller.path);
@@ -15,34 +18,29 @@ export class VoiceGenerator {
    */
   async generate(text: string, outputPath: string, lang: string = 'ko'): Promise<string> {
     console.log('🎤 음성 생성 중... (Google TTS)');
-    console.log(`   출력 경로: ${outputPath}`);
 
-    return new Promise((resolve, reject) => {
-      const outputPathEscaped = outputPath.replace(/\\/g, '/');
-      console.log(`   변환된 경로: ${outputPathEscaped}`);
+    // 임시 Python 스크립트 파일 생성 (PowerShell 문제 해결)
+    const tempScriptPath = path.join(os.tmpdir(), `tts_${Date.now()}.py`);
+    const outputPathEscaped = outputPath.replace(/\\/g, '/');
 
-      const pythonScript = `# -*- coding: utf-8 -*-
+    const pythonScript = `# -*- coding: utf-8 -*-
 import sys
 import os
+from gtts import gTTS
+
+text = """${text}"""
+output_path = r"${outputPathEscaped}"
+
 try:
-    from gtts import gTTS
-
-    text = """${text}"""
-    output_path = r"${outputPathEscaped}"
-
-    print(f"DEBUG: 출력 경로 = {output_path}", file=sys.stderr)
-
     # 디렉토리 생성
-    dir_path = os.path.dirname(output_path)
-    print(f"DEBUG: 디렉토리 = {dir_path}", file=sys.stderr)
-    os.makedirs(dir_path, exist_ok=True)
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
+    # TTS 생성
     tts = gTTS(text, lang='${lang}')
     tts.save(output_path)
 
     # 파일 생성 확인
     if os.path.exists(output_path):
-        print(f"DEBUG: 파일 생성 성공 = {output_path}", file=sys.stderr)
         print("완료")
     else:
         print("ERROR: 파일 생성 실패", file=sys.stderr)
@@ -54,7 +52,10 @@ except Exception as e:
     sys.exit(1)
 `;
 
-      const pythonProcess = spawn('python', ['-c', pythonScript], { shell: true });
+    await fs.writeFile(tempScriptPath, pythonScript, 'utf-8');
+
+    return new Promise((resolve, reject) => {
+      const pythonProcess = spawn('python', [tempScriptPath], { shell: true });
       let stdout = '';
       let stderr = '';
 
@@ -66,10 +67,13 @@ except Exception as e:
         stderr += data.toString();
       });
 
-      pythonProcess.on('close', (code) => {
-        console.log(`   Python 종료 코드: ${code}`);
-        console.log(`   stdout: ${stdout}`);
-        console.log(`   stderr: ${stderr}`);
+      pythonProcess.on('close', async (code) => {
+        // 임시 파일 삭제
+        try {
+          await fs.unlink(tempScriptPath);
+        } catch (err) {
+          // 무시
+        }
 
         if (code !== 0 || stderr.includes('ERROR')) {
           reject(new Error(`Google TTS 실패:\n${stderr}`));
@@ -79,7 +83,13 @@ except Exception as e:
         }
       });
 
-      pythonProcess.on('error', (err) => {
+      pythonProcess.on('error', async (err) => {
+        // 임시 파일 삭제
+        try {
+          await fs.unlink(tempScriptPath);
+        } catch (e) {
+          // 무시
+        }
         reject(new Error(`Python 실행 실패: ${err.message}`));
       });
     });
