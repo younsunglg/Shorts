@@ -1,9 +1,6 @@
-import { exec } from 'child_process';
+import { spawn } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
-import path from 'path';
-
-const execAsync = promisify(exec);
 
 export class AudioGenerator {
   /**
@@ -12,14 +9,13 @@ export class AudioGenerator {
   async generate(text: string, outputPath: string, lang: string = 'ko'): Promise<string> {
     console.log('🎤 Google TTS로 음성 생성 중... (무료)');
 
-    try {
-      // 임시 Python 스크립트 생성 (인코딩 문제 해결)
-      const tempScriptPath = path.join(path.dirname(outputPath), 'tts_script.py');
-      const outputPathEscaped = outputPath.replace(/\\/g, '/'); // Windows 경로 수정
+    return new Promise((resolve, reject) => {
+      // Windows 경로를 슬래시로 변환
+      const outputPathEscaped = outputPath.replace(/\\/g, '/');
 
+      // Python 스크립트를 stdin으로 전달
       const pythonScript = `# -*- coding: utf-8 -*-
 from gtts import gTTS
-import sys
 
 text = """${text}"""
 output_path = r"${outputPathEscaped}"
@@ -29,19 +25,29 @@ tts.save(output_path)
 print("TTS 완료")
 `;
 
-      await fs.writeFile(tempScriptPath, pythonScript, 'utf-8');
+      const pythonProcess = spawn('python', ['-c', pythonScript], {
+        shell: true,
+      });
 
-      // Python 스크립트 실행
-      await execAsync(`python "${tempScriptPath}"`);
+      let stderr = '';
 
-      // 임시 스크립트 삭제
-      await fs.unlink(tempScriptPath);
+      pythonProcess.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
 
-      console.log(`✅ 음성 생성 완료: ${outputPath}`);
-      return outputPath;
-    } catch (error: any) {
-      throw new Error(`Google TTS 음성 생성 실패: ${error.message}`);
-    }
+      pythonProcess.on('close', (code) => {
+        if (code !== 0) {
+          reject(new Error(`Google TTS 실패: ${stderr}`));
+        } else {
+          console.log(`✅ 음성 생성 완료: ${outputPath}`);
+          resolve(outputPath);
+        }
+      });
+
+      pythonProcess.on('error', (err) => {
+        reject(new Error(`Python 실행 실패: ${err.message}`));
+      });
+    });
   }
 
   /**
