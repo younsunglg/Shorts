@@ -174,7 +174,8 @@ export class FFmpegRenderer {
     duration: number,
     style: string
   ): Promise<string> {
-    const backgroundPath = path.join('./temp', `background_${Date.now()}.mp4`);
+    const tempDir = path.resolve('./temp');
+    const backgroundPath = path.join(tempDir, `background_${Date.now()}.mp4`);
 
     // 스타일별 색상
     const colors = {

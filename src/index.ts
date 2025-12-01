@@ -102,9 +102,11 @@ async function generateShorts(options: any) {
   Logger.info(`  - 해시태그: ${script.hashtags.join(', ')}\n`);
 
   // 스크립트를 JSON으로 저장
-  const outputDir = path.dirname(options.output);
+  const outputDir = path.resolve(path.dirname(options.output));
+  const tempDir = path.resolve('./temp');
+
   await fs.mkdir(outputDir, { recursive: true });
-  await fs.mkdir('./temp', { recursive: true });
+  await fs.mkdir(tempDir, { recursive: true });
 
   const scriptPath = path.join(outputDir, 'script.json');
   await fs.writeFile(scriptPath, JSON.stringify(script, null, 2));
@@ -117,7 +119,7 @@ async function generateShorts(options: any) {
     const audioGen = new AudioGenerator(openaiKey, process.env.ELEVENLABS_API_KEY);
     const fullText = scriptGen.combineScriptToText(script);
 
-    audioPath = path.join('./temp', 'audio.mp3');
+    audioPath = path.join(tempDir, 'audio.mp3');
 
     // TTS 제공자 선택
     if (options.tts === 'edge') {
