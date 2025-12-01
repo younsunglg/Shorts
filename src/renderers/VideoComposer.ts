@@ -1,14 +1,16 @@
 import ffmpeg from 'fluent-ffmpeg';
 import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import ffprobeInstaller from '@ffprobe-installer/ffprobe';
-import path from 'path';
 
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 ffmpeg.setFfprobePath(ffprobeInstaller.path);
 
+/**
+ * sb-render 기반 비디오 합성
+ */
 export class VideoComposer {
   /**
-   * 배경 비디오 생성
+   * 배경 비디오 생성 (단색 또는 그라데이션)
    */
   async createBackground(
     duration: number,
@@ -29,16 +31,17 @@ export class VideoComposer {
         ])
         .output(outputPath)
         .on('end', () => {
-          console.log(`✅ 배경 생성 완료: ${outputPath}`);
+          console.log(`✅ 배경 생성 완료`);
           resolve(outputPath);
         })
-        .on('error', (err) => reject(err))
+        .on('error', (err) => reject(new Error(`배경 생성 실패: ${err.message}`)))
         .run();
     });
   }
 
   /**
    * 최종 비디오 합성 (배경 + 오디오 + 자막)
+   * sb-render VideoComposer 로직 활용
    */
   async compose(
     backgroundPath: string,
@@ -49,12 +52,12 @@ export class VideoComposer {
   ): Promise<string> {
     console.log('🎬 비디오 합성 중...');
 
-    // Windows 경로 처리: 백슬래시를 슬래시로 변환하고 이스케이프
-    const subtitlePathEscaped = subtitlePath
-      .replace(/\\/g, '/')
-      .replace(/:/g, '\\:');
-
     return new Promise((resolve, reject) => {
+      // Windows 경로를 슬래시로 변환하고 콜론 이스케이프
+      const subtitlePathEscaped = subtitlePath
+        .replace(/\\/g, '/')
+        .replace(/:/g, '\\:');
+
       ffmpeg()
         .input(backgroundPath)
         .input(audioPath)
@@ -66,11 +69,12 @@ export class VideoComposer {
           '-t ' + duration.toString(),
           '-preset medium',
           '-crf 23',
+          '-pix_fmt yuv420p',
         ])
         .output(outputPath)
         .on('progress', (progress) => {
           if (progress.percent) {
-            console.log(`진행률: ${Math.floor(progress.percent)}%`);
+            console.log(`   진행률: ${Math.floor(progress.percent)}%`);
           }
         })
         .on('end', () => {

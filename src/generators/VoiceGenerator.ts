@@ -1,19 +1,24 @@
 import { spawn } from 'child_process';
-import { promisify } from 'util';
-import fs from 'fs/promises';
+import ffmpeg from 'fluent-ffmpeg';
+import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
+import ffprobeInstaller from '@ffprobe-installer/ffprobe';
 
-export class AudioGenerator {
+ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+ffmpeg.setFfprobePath(ffprobeInstaller.path);
+
+/**
+ * Google TTS 음성 생성 (무료)
+ */
+export class VoiceGenerator {
   /**
-   * Google TTS로 음성 생성 (무료!)
+   * 텍스트를 음성으로 변환
    */
   async generate(text: string, outputPath: string, lang: string = 'ko'): Promise<string> {
-    console.log('🎤 Google TTS로 음성 생성 중... (무료)');
+    console.log('🎤 음성 생성 중... (Google TTS)');
 
     return new Promise((resolve, reject) => {
-      // Windows 경로를 슬래시로 변환
       const outputPathEscaped = outputPath.replace(/\\/g, '/');
 
-      // Python 스크립트를 stdin으로 전달
       const pythonScript = `# -*- coding: utf-8 -*-
 from gtts import gTTS
 
@@ -22,13 +27,10 @@ output_path = r"${outputPathEscaped}"
 
 tts = gTTS(text, lang='${lang}')
 tts.save(output_path)
-print("TTS 완료")
+print("완료")
 `;
 
-      const pythonProcess = spawn('python', ['-c', pythonScript], {
-        shell: true,
-      });
-
+      const pythonProcess = spawn('python', ['-c', pythonScript], { shell: true });
       let stderr = '';
 
       pythonProcess.stderr.on('data', (data) => {
@@ -51,16 +53,9 @@ print("TTS 완료")
   }
 
   /**
-   * 오디오 길이 가져오기 (ffprobe 사용)
+   * 오디오 길이 확인
    */
   async getDuration(audioPath: string): Promise<number> {
-    const ffmpeg = (await import('fluent-ffmpeg')).default;
-    const ffmpegInstaller = (await import('@ffmpeg-installer/ffmpeg')).default;
-    const ffprobeInstaller = (await import('@ffprobe-installer/ffprobe')).default;
-
-    ffmpeg.setFfmpegPath(ffmpegInstaller.path);
-    ffmpeg.setFfprobePath(ffprobeInstaller.path);
-
     return new Promise((resolve, reject) => {
       ffmpeg.ffprobe(audioPath, (err, metadata) => {
         if (err) reject(err);

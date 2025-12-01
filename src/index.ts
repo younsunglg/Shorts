@@ -1,75 +1,75 @@
 #!/usr/bin/env node
-import dotenv from 'dotenv';
 import fs from 'fs/promises';
 import path from 'path';
-import { ScriptGenerator } from './services/ScriptGenerator.js';
-import { AudioGenerator } from './services/AudioGenerator.js';
-import { SubtitleGenerator } from './services/SubtitleGenerator.js';
-import { VideoComposer } from './services/VideoComposer.js';
-
-dotenv.config();
+import { BlogParser } from './parsers/BlogParser.js';
+import { VoiceGenerator } from './generators/VoiceGenerator.js';
+import { SubtitleEngine } from './renderers/SubtitleEngine.js';
+import { VideoComposer } from './renderers/VideoComposer.js';
 
 async function main() {
   const startTime = Date.now();
-
   console.log('🚀 쇼츠 생성 시작...\n');
 
-  // API 키 확인
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    throw new Error('OPENAI_API_KEY가 설정되지 않았습니다. .env 파일을 확인하세요.');
-  }
-
-  // 출력 디렉토리 생성
+  // 디렉토리 생성
   const outputDir = path.resolve('./output');
   const tempDir = path.resolve('./temp');
   await fs.mkdir(outputDir, { recursive: true });
   await fs.mkdir(tempDir, { recursive: true });
 
   // 1. 블로그 글 읽기
-  console.log('📖 블로그 글 읽기...');
-  const blogPath = path.resolve('./blog-content.txt');
-  const blogContent = await fs.readFile(blogPath, 'utf-8');
-  console.log(`✅ 블로그 글 로드 완료 (${blogContent.length}자)\n`);
+  console.log('📖 블로그 파싱 중...');
+  const blogPath = path.resolve('./blog.md');
+  const blogMarkdown = await fs.readFile(blogPath, 'utf-8');
 
-  // 2. AI 스크립트 생성
-  console.log('🤖 AI 스크립트 생성 중...');
-  const scriptGen = new ScriptGenerator(apiKey);
-  const script = await scriptGen.generate(blogContent);
+  const parser = new BlogParser();
+  const blogContent = parser.parse(blogMarkdown);
 
-  console.log('✅ 스크립트 생성 완료!');
-  console.log(`   훅: "${script.hook}"`);
-  console.log(`   포인트: ${script.points.length}개`);
-  console.log(`   결론: "${script.conclusion}"\n`);
+  console.log(`✅ 제목: "${blogContent.title}"`);
+  console.log(`✅ 30초 요약: ${blogContent.summary.length}개 포인트\n`);
 
-  // 스크립트 저장
-  const scriptPath = path.join(outputDir, 'script.json');
-  await fs.writeFile(scriptPath, JSON.stringify(script, null, 2));
+  // 2. 스크립트 생성 (30초 요약을 그대로 사용)
+  const script = parser.toScript(blogContent);
+  const scriptPath = path.join(outputDir, 'script.txt');
+  await fs.writeFile(scriptPath, script, 'utf-8');
 
-  // 3. 음성 생성 (Google TTS - 무료!)
-  const audioGen = new AudioGenerator();
-  const fullText = scriptGen.toFullText(script);
+  console.log('📝 스크립트:');
+  blogContent.summary.forEach((point, i) => {
+    console.log(`   ${i + 1}. ${point}`);
+  });
+  console.log();
+
+  // 3. 음성 생성
+  const voiceGen = new VoiceGenerator();
   const audioPath = path.join(tempDir, 'audio.mp3');
-  await audioGen.generate(fullText, audioPath);
+  await voiceGen.generate(script, audioPath);
 
   // 4. 오디오 길이 확인
-  const audioDuration = await audioGen.getDuration(audioPath);
+  const audioDuration = await voiceGen.getDuration(audioPath);
   console.log(`📊 오디오 길이: ${audioDuration.toFixed(1)}초\n`);
 
-  // 5. 자막 생성
-  const subtitleGen = new SubtitleGenerator();
-  const segments = subtitleGen.createSegments(script, audioDuration);
+  // 5. 타이밍 계산
+  const timings = parser.calculateTimings(blogContent.summary, audioDuration);
+
+  // 6. 자막 생성
+  const subtitleEngine = new SubtitleEngine();
   const subtitlePath = path.join(tempDir, 'subtitles.ass');
-  await subtitleGen.generateASS(segments, subtitlePath);
+  await subtitleEngine.generateASS(timings, subtitlePath, {
+    fontSize: 85,
+    primaryColor: '#FFFFFF',
+    outlineColor: '#000000',
+    outlineWidth: 4,
+    bold: true,
+    position: 'bottom',
+  });
   console.log();
 
-  // 6. 배경 생성
+  // 7. 배경 생성
   const videoComposer = new VideoComposer();
   const backgroundPath = path.join(tempDir, 'background.mp4');
-  await videoComposer.createBackground(audioDuration, backgroundPath);
+  await videoComposer.createBackground(audioDuration, backgroundPath, '#667eea');
   console.log();
 
-  // 7. 최종 비디오 합성
+  // 8. 최종 비디오 합성
   const outputPath = path.join(outputDir, 'shorts.mp4');
   await videoComposer.compose(
     backgroundPath,
@@ -81,9 +81,9 @@ async function main() {
 
   // 완료
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-  console.log('\n' + '='.repeat(50));
+  console.log('\n' + '='.repeat(60));
   console.log(`✨ 완료! (${elapsed}초 소요)`);
-  console.log('='.repeat(50));
+  console.log('='.repeat(60));
   console.log(`\n📁 생성된 파일:`);
   console.log(`   비디오: ${outputPath}`);
   console.log(`   스크립트: ${scriptPath}`);
@@ -93,5 +93,6 @@ async function main() {
 
 main().catch((error) => {
   console.error('\n❌ 오류 발생:', error.message);
+  console.error(error.stack);
   process.exit(1);
 });
