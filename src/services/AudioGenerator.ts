@@ -1,34 +1,26 @@
-import OpenAI from 'openai';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import fs from 'fs/promises';
 
+const execAsync = promisify(exec);
+
 export class AudioGenerator {
-  private openai: OpenAI;
-
-  constructor(apiKey: string) {
-    this.openai = new OpenAI({ apiKey });
-  }
-
   /**
-   * OpenAI TTS로 음성 생성
+   * Google TTS로 음성 생성 (무료!)
    */
-  async generate(
-    text: string,
-    outputPath: string,
-    voice: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer' = 'nova'
-  ): Promise<string> {
-    console.log('🎤 음성 생성 중...');
+  async generate(text: string, outputPath: string, lang: string = 'ko'): Promise<string> {
+    console.log('🎤 Google TTS로 음성 생성 중... (무료)');
 
-    const mp3 = await this.openai.audio.speech.create({
-      model: 'tts-1',
-      voice: voice,
-      input: text,
-    });
+    try {
+      // Python gTTS 사용
+      const command = `python -c "from gtts import gTTS; tts = gTTS('${text.replace(/'/g, "\\'")}', lang='${lang}'); tts.save('${outputPath}')"`;
+      await execAsync(command);
 
-    const buffer = Buffer.from(await mp3.arrayBuffer());
-    await fs.writeFile(outputPath, buffer);
-
-    console.log(`✅ 음성 생성 완료: ${outputPath}`);
-    return outputPath;
+      console.log(`✅ 음성 생성 완료: ${outputPath}`);
+      return outputPath;
+    } catch (error) {
+      throw new Error(`Google TTS 음성 생성 실패: ${error}`);
+    }
   }
 
   /**

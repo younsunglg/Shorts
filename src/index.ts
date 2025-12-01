@@ -46,8 +46,8 @@ async function main() {
   const scriptPath = path.join(outputDir, 'script.json');
   await fs.writeFile(scriptPath, JSON.stringify(script, null, 2));
 
-  // 3. 음성 생성
-  const audioGen = new AudioGenerator(apiKey);
+  // 3. 음성 생성 (Google TTS - 무료!)
+  const audioGen = new AudioGenerator();
   const fullText = scriptGen.toFullText(script);
   const audioPath = path.join(tempDir, 'audio.mp3');
   await audioGen.generate(fullText, audioPath);

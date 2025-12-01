@@ -10,10 +10,16 @@ npm install
 
 ## ⚙️ 설정
 
-`.env` 파일 생성:
+1. `.env` 파일 생성:
 
 ```env
 OPENAI_API_KEY=your_openai_api_key_here
+```
+
+2. Google TTS 설치 (무료):
+
+```bash
+pip install gTTS
 ```
 
 ## 📝 사용법
@@ -38,7 +44,7 @@ npm run generate
 ## 🔧 기술 스택
 
 - **AI**: OpenAI GPT-4o-mini (스크립트 생성)
-- **TTS**: OpenAI TTS (음성 생성)
+- **TTS**: Google TTS (음성 생성) - **완전 무료!**
 - **Video**: FFmpeg (비디오 합성)
 - **Subtitles**: ASS 포맷
 
