@@ -19,7 +19,7 @@ export class ScriptGenerator {
 
     try {
       const completion = await this.openai.chat.completions.create({
-        model: 'gpt-4-turbo-preview',
+        model: 'gpt-4o-mini', // 최신 모델, 비용 효율적
         messages: [
           {
             role: 'system',
