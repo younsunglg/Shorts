@@ -10,46 +10,48 @@ ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 ffmpeg.setFfprobePath(ffprobeInstaller.path);
 
 /**
- * Google TTS 음성 생성 (무료)
+ * Edge TTS 음성 생성 (무료, Microsoft)
  */
 export class VoiceGenerator {
   /**
    * 텍스트를 음성으로 변환
    */
   async generate(text: string, outputPath: string, lang: string = 'ko'): Promise<string> {
-    console.log('🎤 음성 생성 중... (Google TTS)');
+    console.log('🎤 음성 생성 중... (Microsoft Edge TTS)');
 
-    // 임시 Python 스크립트 파일 생성 (PowerShell 문제 해결)
+    // 임시 Python 스크립트 파일 생성
     const tempScriptPath = path.join(os.tmpdir(), `tts_${Date.now()}.py`);
     const outputPathEscaped = outputPath.replace(/\\/g, '/');
+    const voice = lang === 'ko' ? 'ko-KR-SunHiNeural' : 'en-US-AriaNeural';
 
     const pythonScript = `# -*- coding: utf-8 -*-
 import sys
 import os
-from gtts import gTTS
+import asyncio
+import edge_tts
 
-text = """${text}"""
+text = """${text.replace(/"/g, '\\"')}"""
 output_path = r"${outputPathEscaped}"
+voice = "${voice}"
 
-try:
-    # 디렉토리 생성
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+async def generate_speech():
+    try:
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        communicate = edge_tts.Communicate(text, voice)
+        await communicate.save(output_path)
 
-    # TTS 생성
-    tts = gTTS(text, lang='${lang}')
-    tts.save(output_path)
-
-    # 파일 생성 확인
-    if os.path.exists(output_path):
-        print("완료")
-    else:
-        print("ERROR: 파일 생성 실패", file=sys.stderr)
+        if os.path.exists(output_path):
+            print("완료")
+        else:
+            print("ERROR: 파일 생성 실패", file=sys.stderr)
+            sys.exit(1)
+    except Exception as e:
+        print(f"ERROR: {str(e)}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
         sys.exit(1)
-except Exception as e:
-    print(f"ERROR: {str(e)}", file=sys.stderr)
-    import traceback
-    traceback.print_exc(file=sys.stderr)
-    sys.exit(1)
+
+asyncio.run(generate_speech())
 `;
 
     await fs.writeFile(tempScriptPath, pythonScript, 'utf-8');
@@ -76,7 +78,7 @@ except Exception as e:
         }
 
         if (code !== 0 || stderr.includes('ERROR')) {
-          reject(new Error(`Google TTS 실패:\n${stderr}`));
+          reject(new Error(`Edge TTS 실패:\n${stderr}`));
         } else {
           console.log(`✅ 음성 생성 완료: ${outputPath}`);
           resolve(outputPath);
