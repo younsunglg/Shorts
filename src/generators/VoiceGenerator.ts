@@ -19,9 +19,10 @@ export class VoiceGenerator {
   async generate(text: string, outputPath: string, lang: string = 'ko'): Promise<string> {
     console.log('🎤 음성 생성 중... (오프라인 TTS)');
 
-    // 임시 Python 스크립트 파일 생성
+    // 임시 WAV 파일 경로
+    const tempWavPath = outputPath.replace(/\.mp3$/, '.wav');
     const tempScriptPath = path.join(os.tmpdir(), `tts_${Date.now()}.py`);
-    const outputPathEscaped = outputPath.replace(/\\/g, '/');
+    const wavPathEscaped = tempWavPath.replace(/\\/g, '/');
 
     const pythonScript = `# -*- coding: utf-8 -*-
 import sys
@@ -29,10 +30,10 @@ import os
 import pyttsx3
 
 text = """${text.replace(/"/g, '\\"')}"""
-output_path = r"${outputPathEscaped}"
+wav_path = r"${wavPathEscaped}"
 
 try:
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    os.makedirs(os.path.dirname(wav_path), exist_ok=True)
 
     engine = pyttsx3.init()
 
@@ -42,14 +43,14 @@ try:
     # 볼륨 조절 (0.0 ~ 1.0)
     engine.setProperty('volume', 1.0)
 
-    # 음성 파일 저장
-    engine.save_to_file(text, output_path)
+    # WAV 파일로 저장
+    engine.save_to_file(text, wav_path)
     engine.runAndWait()
 
-    if os.path.exists(output_path):
+    if os.path.exists(wav_path) and os.path.getsize(wav_path) > 0:
         print("완료")
     else:
-        print("ERROR: 파일 생성 실패", file=sys.stderr)
+        print("ERROR: 파일 생성 실패 또는 빈 파일", file=sys.stderr)
         sys.exit(1)
 except Exception as e:
     print(f"ERROR: {str(e)}", file=sys.stderr)
@@ -84,8 +85,26 @@ except Exception as e:
         if (code !== 0 || stderr.includes('ERROR')) {
           reject(new Error(`TTS 음성 생성 실패:\n${stderr}`));
         } else {
-          console.log(`✅ 음성 생성 완료: ${outputPath}`);
-          resolve(outputPath);
+          // WAV → MP3 변환 (FFmpeg)
+          console.log('🔄 WAV → MP3 변환 중...');
+          ffmpeg(tempWavPath)
+            .toFormat('mp3')
+            .audioCodec('libmp3lame')
+            .audioBitrate('128k')
+            .on('end', async () => {
+              // WAV 파일 삭제
+              try {
+                await fs.unlink(tempWavPath);
+              } catch (err) {
+                // 무시
+              }
+              console.log(`✅ 음성 생성 완료: ${outputPath}`);
+              resolve(outputPath);
+            })
+            .on('error', (err) => {
+              reject(new Error(`MP3 변환 실패: ${err.message}`));
+            })
+            .save(outputPath);
         }
       });
 
