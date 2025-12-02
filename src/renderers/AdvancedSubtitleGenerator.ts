@@ -1,4 +1,4 @@
-import type { Script } from '../parsers/BlogParser.js';
+import type { BlogContent } from '../parsers/BlogParser.js';
 
 export interface WordTiming {
   word: string;
@@ -14,6 +14,8 @@ export class AdvancedSubtitleGenerator {
    * 문장을 단어/구 단위로 분할
    */
   splitIntoWords(text: string): string[] {
+    if (!text) return [];
+
     // 한국어는 조사를 포함한 어절 단위로 분할
     // 영어는 단어 단위
     const words: string[] = [];
@@ -36,33 +38,26 @@ export class AdvancedSubtitleGenerator {
   }
 
   /**
-   * 스크립트를 단어 타이밍으로 변환
+   * BlogContent를 단어 타이밍으로 변환
    */
-  createWordTimings(script: Script, totalDuration: number): WordTiming[] {
+  createWordTimings(content: BlogContent, totalDuration: number): WordTiming[] {
     const allWords: WordTiming[] = [];
     let currentTime = 0;
 
-    // 훅 (3초)
-    const hookWords = this.splitIntoWords(script.hook);
-    const hookDuration = 3;
-    const hookTimePerWord = hookDuration / hookWords.length;
+    // 모든 요약 포인트를 시간에 균등 배분
+    const { summary } = content;
+    if (!summary || summary.length === 0) {
+      return allWords;
+    }
 
-    hookWords.forEach((word) => {
-      allWords.push({
-        word,
-        start: currentTime,
-        end: currentTime + hookTimePerWord,
-      });
-      currentTime += hookTimePerWord;
-    });
+    const timePerPoint = totalDuration / summary.length;
 
-    // 포인트들 (균등 배분)
-    const pointsDuration = totalDuration - hookDuration - 5;
-    const durationPerPoint = pointsDuration / script.points.length;
-
-    script.points.forEach((point) => {
+    // 각 요약 포인트를 단어로 분할하고 타이밍 할당
+    summary.forEach((point) => {
       const words = this.splitIntoWords(point);
-      const timePerWord = durationPerPoint / words.length;
+      if (words.length === 0) return;
+
+      const timePerWord = timePerPoint / words.length;
 
       words.forEach((word) => {
         allWords.push({
@@ -72,20 +67,6 @@ export class AdvancedSubtitleGenerator {
         });
         currentTime += timePerWord;
       });
-    });
-
-    // 결론 (마지막 5초)
-    const conclusionWords = this.splitIntoWords(script.conclusion);
-    const conclusionDuration = 5;
-    const conclusionTimePerWord = conclusionDuration / conclusionWords.length;
-
-    conclusionWords.forEach((word) => {
-      allWords.push({
-        word,
-        start: currentTime,
-        end: currentTime + conclusionTimePerWord,
-      });
-      currentTime += conclusionTimePerWord;
     });
 
     return allWords;
